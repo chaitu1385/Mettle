@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coach-rl"
+version = "0.1.0"
+description = "An RL-instrumented executive coaching agent: action selection, reward design, and exploration, logged as trainable data."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Krishna" }]
+keywords = ["reinforcement-learning", "llm", "coaching", "off-policy-evaluation"]
+
+dependencies = [
+    "anthropic>=1.0",
+    "langgraph>=1.0",
+    "pydantic>=2.7",
+    "scipy>=1.11",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+coach-run = "coach_rl.cli.run:main"
+coach-label = "coach_rl.cli.replay:main"
+coach-stats = "coach_rl.cli.stats:main"
+
+[tool.setuptools]
+packages = ["coach_rl", "coach_rl.cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
