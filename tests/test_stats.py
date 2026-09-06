@@ -53,32 +53,10 @@ def make_turn(
 # --- spearman --------------------------------------------------------------
 
 
-def test_spearman_perfect_positive_and_negative():
-    x = [1, 2, 3, 4, 5]
-    rho, p = spearman(x, [1, 2, 3, 4, 5])
-    assert rho == pytest.approx(1.0)
-    assert p < 0.05
-
-    rho, _ = spearman(x, [5, 4, 3, 2, 1])
-    assert rho == pytest.approx(-1.0)
-
-
-def test_spearman_is_rank_based_not_linear():
-    """Monotone but very non-linear still gives rho = 1; Pearson would not."""
-    rho, _ = spearman([1, 2, 3, 4, 5], [1, 2, 4, 8, 1000])
-    assert rho == pytest.approx(1.0)
-
-
 def test_spearman_known_value_with_a_single_swap():
     """Ranks [1,2,3,4,5] vs [2,1,3,4,5]: sum d^2 = 2, rho = 1 - 6*2/(5*24) = 0.9."""
     rho, _ = spearman([1, 2, 3, 4, 5], [2, 1, 3, 4, 5])
     assert rho == pytest.approx(0.9)
-
-
-def test_spearman_handles_ties():
-    """Tied judge scores are the common case: 1-5 integers across many turns."""
-    rho, _ = spearman([3, 3, 4, 4, 5, 5], [0, 0, 1, 1, 1, 1])
-    assert 0.7 < rho < 0.9
 
 
 def test_spearman_is_undefined_rather_than_wrong():

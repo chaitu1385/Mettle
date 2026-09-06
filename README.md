@@ -132,7 +132,6 @@ cp .env.example .env             # add ANTHROPIC_API_KEY
 ```bash
 coach-run                        # a coaching session; every turn is logged
 coach-run --eps 0.3 --seed 7     # more exploration, reproducible draws
-coach-run --show-judge           # watch the rewards land a turn behind
 
 coach-label --list               # list sessions
 coach-label --session <id>       # replay it, attach -1 / 0 / +1 to each turn
@@ -148,9 +147,9 @@ Defaults live in `coach_rl/config.py` and can be overridden by env or `.env`:
 
 ## Structure
 
-The package is layered, and the layering is enforced by a test
-(`tests/test_layering.py`) rather than left to good intentions: imports may only
-point downwards, and each third-party boundary lives in exactly one module.
+The package is layered -- imports point downwards only. One rule is worth a test
+(`tests/test_layering.py`): each third-party boundary lives in exactly one
+module, so the domain never learns who the vendor is.
 
 ```
 5  cli/run.py, cli/replay.py, cli/stats.py   terminal entry points
@@ -171,7 +170,7 @@ point downwards, and each third-party boundary lives in exactly one module.
 Consequences worth stating:
 
 - `anthropic` is imported only by `llm.py`, `langgraph` only by `graph.py`,
-  `scipy` only by `stats.py`. The domain does not know who the vendor is.
+  `scipy` only by `stats.py`.
 - `graph.py`, `judge.py`, and `session.py` depend on the `LLMClient` **Protocol**,
   not the client, so the whole decision loop runs against a stub with no API key
   — which is exactly how `tests/test_session_flow.py` exercises it.
@@ -190,8 +189,9 @@ pytest
 Covering the SQLite schema and its constraints, the state and judge models, the
 policy interface and epsilon mixing, the correlation maths (pinned to
 hand-computed Spearman values), report rendering, the prompt-version guard, the
-turn-loop ordering with a stub LLM, and the layering rules above. **The LLM
-calls themselves are not tested.**
+turn-loop ordering with a stub LLM, and the vendor-boundary rule. **The LLM
+calls themselves are not tested**, and neither is scipy: the tests cover this
+codebase's own logic and nothing else.
 
 ## Out of scope for this milestone
 

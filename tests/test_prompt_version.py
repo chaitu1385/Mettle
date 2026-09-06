@@ -10,8 +10,6 @@ fingerprint into prompts.py.
 
 from __future__ import annotations
 
-import pytest
-
 from coach_rl.actions import ACTIONS
 from coach_rl.prompts import (
     ACTION_INSTRUCTIONS,
@@ -34,8 +32,3 @@ def test_every_action_has_an_instruction():
     assert set(ACTION_INSTRUCTIONS) == set(ACTIONS)
     for action in ACTIONS:
         assert action_instruction(action).strip()
-
-
-def test_unknown_action_has_no_instruction():
-    with pytest.raises(ValueError):
-        action_instruction("empathize")

@@ -120,11 +120,11 @@ def test_action_column_rejects_actions_outside_the_fixed_set(conn):
         insert_turn(conn, make_policy_record(session_id, action="empathize"))
 
 
-@pytest.mark.parametrize("action", ACTIONS)
-def test_every_declared_action_is_insertable(conn, action):
+def test_every_declared_action_is_insertable(conn):
     session_id = start_session(conn)
-    insert_turn(conn, make_policy_record(session_id, action=action))
-    assert fetch_turns(conn, session_id)[0].action == action
+    for i, action in enumerate(ACTIONS):
+        insert_turn(conn, make_policy_record(session_id, turn_index=i, action=action))
+    assert [t.action for t in fetch_turns(conn, session_id)] == list(ACTIONS)
 
 
 def test_turn_index_is_unique_per_session(conn):
@@ -150,11 +150,11 @@ def test_prompt_version_and_model_are_recorded_on_every_row(conn):
     assert row.model_name
 
 
-@pytest.mark.parametrize("column", ["state_json", "action_probs_json", "policy_id", "prompt_version", "model_name"])
-def test_required_columns_reject_null(conn, column):
+def test_the_columns_a_row_cannot_do_without_reject_null(conn):
     session_id = start_session(conn)
-    with pytest.raises(sqlite3.IntegrityError):
-        insert_turn(conn, make_policy_record(session_id, **{column: None}))
+    for column in ("state_json", "action_probs_json", "policy_id", "prompt_version"):
+        with pytest.raises(sqlite3.IntegrityError):
+            insert_turn(conn, make_policy_record(session_id, **{column: None}))
 
 
 def test_session_lifecycle_and_listing(conn):

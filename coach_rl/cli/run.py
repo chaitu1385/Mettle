@@ -32,11 +32,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--seed", type=int, default=None, help="Seed the exploration RNG")
     parser.add_argument("--notes", default=None, help="Session notes stored on the row")
-    parser.add_argument(
-        "--show-judge",
-        action="store_true",
-        help="Print judge scores as they land (they arrive a turn late)",
-    )
     return parser.parse_args(argv)
 
 
@@ -50,11 +45,7 @@ async def run(args: argparse.Namespace) -> int:
 
     with open_db(args.db) as conn:
         session = CoachSession.start(
-            llm=llm,
-            policy=policy,
-            conn=conn,
-            notes=args.notes,
-            verbose_judge=args.show_judge,
+            llm=llm, policy=policy, conn=conn, notes=args.notes
         )
         print(BANNER)
         print(

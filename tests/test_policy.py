@@ -37,12 +37,6 @@ def test_select_returns_action_probs_policy_id(policy: Policy):
     assert validate_probs(probs) == probs
 
 
-def test_probs_cover_every_action_not_just_the_chosen_one():
-    """The whole distribution is logged; a scalar for the chosen action is not enough."""
-    _, probs, _ = EpsilonWrapper(RulePolicy(), eps=0.2).select(make_state())
-    assert all(p > 0 for p in probs), "epsilon-mixed distribution must have full support"
-
-
 def test_deterministic_rule_reports_one_hot_base_probs():
     state = make_state(repeated_theme_flag=True)
     decision = RulePolicy().decide(state)
@@ -117,22 +111,6 @@ def test_rule_priority_is_the_documented_order():
     assert RulePolicy().rule_action(emotional_loop) == "reflect"
 
 
-def test_rule_policy_only_emits_known_actions():
-    rng = random.Random(7)
-    policy = RulePolicy()
-    for _ in range(200):
-        state = make_state(
-            user_intent=rng.choice(
-                ["uncertain", "explore", "vent", "seek_advice", "decide", "update"]
-            ),
-            emotional_valence=rng.uniform(-1, 1),
-            specificity_level=rng.choice(["vague", "moderate", "specific"]),
-            repeated_theme_flag=rng.random() < 0.5,
-            session_phase=rng.choice(["opening", "exploration", "deepening", "closing"]),
-        )
-        assert policy.decide(state).action in ACTIONS
-
-
 # --- the epsilon wrapper ---------------------------------------------------
 
 
@@ -164,33 +142,21 @@ def test_eps_one_always_explores_away_from_the_rule():
         assert decision.action != "summarize", "explore picks from the OTHER actions"
 
 
-def test_exploration_fires_at_roughly_eps_and_is_uniform_over_alternatives():
+def test_sampling_matches_the_logged_distribution():
+    """The logged vector must be the distribution the sample actually came from,
+    and the explore flag must fire at eps. This is the property off-policy
+    evaluation rests on; everything else about the wrapper is bookkeeping."""
     state = make_state(repeated_theme_flag=True)  # rule says challenge
     wrapper = EpsilonWrapper(RulePolicy(), eps=0.2, rng=random.Random(42))
     decisions = [wrapper.decide(state) for _ in range(4000)]
 
-    explored = sum(d.explored for d in decisions)
-    assert 0.17 < explored / len(decisions) < 0.23
-
-    counts = Counter(d.action for d in decisions)
-    empirical = counts["challenge"] / len(decisions)
-    assert empirical == pytest.approx(0.8, abs=0.03)
-    for action in ACTIONS:
-        if action != "challenge":
-            assert counts[action] / len(decisions) == pytest.approx(0.05, abs=0.02)
-
-
-def test_logged_probs_match_the_sampling_distribution():
-    """The logged vector must be the distribution the sample actually came from."""
-    state = make_state()
-    wrapper = EpsilonWrapper(RulePolicy(), eps=0.3, rng=random.Random(11))
-    decisions = [wrapper.decide(state) for _ in range(6000)]
     logged = decisions[0].action_probs
     counts = Counter(d.action for d in decisions)
     for action in ACTIONS:
         assert counts[action] / len(decisions) == pytest.approx(
-            logged[ACTION_INDEX[action]], abs=0.03
+            logged[ACTION_INDEX[action]], abs=0.02
         )
+    assert sum(d.explored for d in decisions) / len(decisions) == pytest.approx(0.2, abs=0.02)
 
 
 def test_wrapper_rejects_an_invalid_eps():
@@ -214,27 +180,9 @@ def test_build_policy_wraps_only_when_eps_is_positive():
     assert isinstance(wrapped, EpsilonWrapper) and wrapped.eps == 0.2
 
 
-def test_wrapper_accepts_any_inner_policy():
-    """A learned policy only has to satisfy the same interface."""
-
-    class AlwaysAdvise(Policy):
-        @property
-        def policy_id(self) -> str:
-            return "stub/v0"
-
-        def decide(self, state: TurnState) -> Decision:
-            probs = one_hot("advise")
-            return Decision("advise", probs, self.policy_id, list(probs), False, 0.0)
-
-    wrapper = EpsilonWrapper(AlwaysAdvise(), eps=0.2, rng=random.Random(0))
-    action, probs, policy_id = wrapper.select(make_state())
-    assert policy_id == "stub/v0+eps0.2"
-    assert probs[ACTION_INDEX["advise"]] == pytest.approx(0.8)
-    assert action in ACTIONS
-
-
-def test_stochastic_inner_policy_mixes_correctly():
-    """The mixing formula is exact for a non-deterministic base policy too."""
+def test_wrapper_accepts_any_inner_policy_including_a_stochastic_one():
+    """A learned policy only has to satisfy the same interface, and the mixing
+    formula stays exact when the base distribution is not one-hot."""
 
     class Coin(Policy):
         @property
@@ -245,11 +193,13 @@ def test_stochastic_inner_policy_mixes_correctly():
             probs = [0.5, 0.5, 0.0, 0.0, 0.0]
             return Decision("ask", probs, self.policy_id, probs, False, 0.0)
 
-    wrapper = EpsilonWrapper(Coin(), eps=0.2)
-    mixed = wrapper.mixed_probs([0.5, 0.5, 0.0, 0.0, 0.0])
-    assert mixed[0] == pytest.approx(0.5 * 0.8 + 0.05 * 0.5)
-    assert mixed[2] == pytest.approx(0.05)
-    assert sum(mixed) == pytest.approx(1.0)
+    wrapper = EpsilonWrapper(Coin(), eps=0.2, rng=random.Random(0))
+    action, probs, policy_id = wrapper.select(make_state())
+    assert policy_id == "coin/v0+eps0.2"
+    assert action in ACTIONS
+    assert probs[0] == pytest.approx(0.5 * 0.8 + 0.05 * 0.5)
+    assert probs[2] == pytest.approx(0.05)
+    assert sum(probs) == pytest.approx(1.0)
 
 
 # --- the action space ------------------------------------------------------

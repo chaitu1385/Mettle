@@ -47,10 +47,9 @@ async def judge_turn(
 class JudgeRunner:
     """Fire-and-track judge tasks; write scores back to the row when they land."""
 
-    def __init__(self, llm: LLMClient, conn: sqlite3.Connection, verbose: bool = False):
+    def __init__(self, llm: LLMClient, conn: sqlite3.Connection):
         self.llm = llm
         self.conn = conn
-        self.verbose = verbose
         self._tasks: set[asyncio.Task] = set()
         self.failures: list[str] = []
 
@@ -108,11 +107,6 @@ class JudgeRunner:
             json.dumps(payload),
             scores.rationale,
         )
-        if self.verbose:
-            print(
-                f"[judge] turn {turn_index}: insight={scores.insight} "
-                f"specificity={scores.specificity} forward={scores.forward_movement}"
-            )
 
     async def drain(self) -> None:
         """Wait for outstanding judge calls -- call before closing the session."""
