@@ -9,6 +9,10 @@ Everything here exists to make one thing true: every turn writes a row that a
 learning algorithm could actually use later. If the row is wrong, the coaching
 was pointless.
 
+A visual walkthrough of the whole design — the turn timeline, the graph, the
+probability vector, and how it was verified — is in
+[`docs/architecture.html`](docs/architecture.html). Open it in a browser.
+
 ## The loop
 
 ```
