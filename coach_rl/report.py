@@ -11,13 +11,15 @@ import math
 from typing import Sequence
 
 from .actions import ACTIONS
-from .config import CORRELATION_WARN_THRESHOLD, MIN_LABELS_FOR_VALIDATION
-from .schemas import JUDGE_MAX_TOTAL, JUDGE_MIN_TOTAL
 from .stats import (
     BANDS,
+    CORRELATION_WARN_THRESHOLD,
     HUMAN_LABELS,
     JUDGE_HIGH_TOTAL,
     JUDGE_LOW_TOTAL,
+    JUDGE_MAX_TOTAL,
+    JUDGE_MIN_TOTAL,
+    MIN_LABELS_FOR_VALIDATION,
     Correlation,
     LabeledTurn,
     action_distribution,

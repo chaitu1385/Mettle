@@ -1,8 +1,8 @@
-"""Runtime configuration.
+"""Runtime settings: model, database, exploration rate.
 
-Kept deliberately small and dependency-free: a hand-rolled .env reader instead of
+Dependency-free on purpose -- a hand-rolled .env reader rather than
 python-dotenv, so the dependency list stays at langgraph / pydantic / scipy /
-anthropic.
+anthropic. Analysis thresholds live in stats.py, next to the maths they govern.
 """
 
 from __future__ import annotations
@@ -14,12 +14,6 @@ from pathlib import Path
 DEFAULT_MODEL = "claude-opus-5"
 DEFAULT_DB = "coach_rl.db"
 DEFAULT_EPS = 0.2
-
-#: Turns needed before judge-vs-human validation is worth running.
-MIN_LABELS_FOR_VALIDATION = 40
-
-#: Correlation below this means the judge is not measuring what the human sees.
-CORRELATION_WARN_THRESHOLD = 0.3
 
 
 def load_dotenv(path: str | Path = ".env") -> None:

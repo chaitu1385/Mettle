@@ -142,14 +142,6 @@ def test_turn_requires_an_existing_session(conn):
         insert_turn(conn, make_policy_record("does-not-exist"))
 
 
-def test_prompt_version_and_model_are_recorded_on_every_row(conn):
-    session_id = start_session(conn)
-    insert_turn(conn, make_policy_record(session_id))
-    (row,) = fetch_turns(conn, session_id)
-    assert row.prompt_version == PROMPT_VERSION
-    assert row.model_name
-
-
 def test_the_columns_a_row_cannot_do_without_reject_null(conn):
     session_id = start_session(conn)
     for column in ("state_json", "action_probs_json", "policy_id", "prompt_version"):

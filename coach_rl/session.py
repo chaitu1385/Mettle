@@ -15,22 +15,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass
 
 from .graph import build_graph
-from .judge import JudgeRunner
-from .llm import LLMClient
+from .judge import JudgeRunner, PendingTurn
+from .llm import LLM
 from .policy import Policy
 from .prompts import PROMPT_VERSION
 from .storage import TurnRecord, insert_turn, start_session, end_session
-
-
-@dataclass
-class PendingJudge:
-    turn_index: int
-    user_message: str
-    action: str
-    response_text: str
 
 
 class CoachSession:
@@ -38,7 +29,7 @@ class CoachSession:
 
     def __init__(
         self,
-        llm: LLMClient,
+        llm: LLM,
         policy: Policy,
         conn: sqlite3.Connection,
         session_id: str,
@@ -51,12 +42,12 @@ class CoachSession:
         self.judge = JudgeRunner(llm, conn)
         self.history: list[dict[str, str]] = []
         self.turn_index = 0
-        self.pending: PendingJudge | None = None
+        self.pending: PendingTurn | None = None
 
     @classmethod
     def start(
         cls,
-        llm: LLMClient,
+        llm: LLM,
         policy: Policy,
         conn: sqlite3.Connection,
         notes: str | None = None,
@@ -71,14 +62,7 @@ class CoachSession:
     async def turn(self, user_message: str) -> tuple[str, TurnRecord]:
         """Handle one coachee message: judge the previous turn, then answer this one."""
         if self.pending is not None:
-            self.judge.schedule(
-                session_id=self.session_id,
-                turn_index=self.pending.turn_index,
-                user_message=self.pending.user_message,
-                action=self.pending.action,
-                response_text=self.pending.response_text,
-                next_user_message=user_message,
-            )
+            self.judge.schedule(self.pending, next_user_message=user_message)
             self.pending = None
 
         result = await self.graph.ainvoke(
@@ -111,7 +95,8 @@ class CoachSession:
 
         self.history.append({"role": "user", "content": user_message})
         self.history.append({"role": "assistant", "content": response_text})
-        self.pending = PendingJudge(
+        self.pending = PendingTurn(
+            session_id=self.session_id,
             turn_index=self.turn_index,
             user_message=user_message,
             action=decision.action,

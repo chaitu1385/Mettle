@@ -94,5 +94,3 @@ class JudgeScores(BaseModel):
 
 # A module constant, not a model field: it must not leak into the JSON schema.
 JUDGE_DIMENSIONS: tuple[str, ...] = ("insight", "specificity", "forward_movement")
-JUDGE_MIN_TOTAL = 3
-JUDGE_MAX_TOTAL = 15

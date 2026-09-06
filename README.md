@@ -141,7 +141,9 @@ coach-stats                      # dataset stats + judge validation
 
 The CLIs are also runnable without installing: `python -m coach_rl.cli.run`.
 
-Defaults live in `coach_rl/config.py` and can be overridden by env or `.env`:
+Runtime settings live in `coach_rl/config.py` (analysis thresholds live in
+`stats.py`, next to the maths they govern) and can be overridden by env or
+`.env`:
 `COACH_RL_MODEL` (default `claude-opus-5`), `COACH_RL_DB` (default
 `coach_rl.db`), `COACH_RL_EPS` (default `0.2`).
 
@@ -162,7 +164,7 @@ module, so the domain never learns who the vendor is.
    policy.py      Policy interface, RulePolicy, EpsilonWrapper
 1  schemas.py     TurnState, JudgeScores (Pydantic)
    prompts.py     prompt text + PROMPT_VERSION + fingerprint
-   llm.py         LLMClient protocol + the Anthropic client behind it
+   llm.py         the Anthropic client -- the only module that knows the vendor
 0  actions.py     the fixed action space
    config.py      settings and thresholds
 ```
@@ -171,9 +173,9 @@ Consequences worth stating:
 
 - `anthropic` is imported only by `llm.py`, `langgraph` only by `graph.py`,
   `scipy` only by `stats.py`.
-- `graph.py`, `judge.py`, and `session.py` depend on the `LLMClient` **Protocol**,
-  not the client, so the whole decision loop runs against a stub with no API key
-  — which is exactly how `tests/test_session_flow.py` exercises it.
+- `graph.py`, `judge.py`, and `session.py` call exactly two methods on the LLM,
+  so the whole decision loop runs against a stub with no API key — which is how
+  `tests/test_session_flow.py` exercises it.
 - Computation and presentation are separate: `stats.py` returns numbers,
   `report.py` turns them into text. The validation rule ("this dimension fails")
   is defined once, on `Correlation.below_threshold`.

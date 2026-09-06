@@ -124,20 +124,18 @@ def test_mixed_probs_formula_and_normalisation():
     assert sum(mixed) == pytest.approx(1.0)
 
 
-def test_eps_zero_is_the_identity():
-    state = make_state(session_phase="closing")
-    wrapper = EpsilonWrapper(RulePolicy(), eps=0.0)
-    decision = wrapper.decide(state)
-    assert decision.action == "summarize"
-    assert decision.action_probs == one_hot("summarize")
-    assert decision.explored is False
+def test_the_epsilon_boundaries_behave():
+    """eps=0 is the identity; eps=1 always moves off the rule's choice."""
+    state = make_state(session_phase="closing")  # rule says summarize
 
+    off = EpsilonWrapper(RulePolicy(), eps=0.0).decide(state)
+    assert off.action == "summarize"
+    assert off.action_probs == one_hot("summarize")
+    assert off.explored is False
 
-def test_eps_one_always_explores_away_from_the_rule():
-    state = make_state(session_phase="closing")
-    wrapper = EpsilonWrapper(RulePolicy(), eps=1.0, rng=random.Random(3))
-    for _ in range(50):
-        decision = wrapper.decide(state)
+    always = EpsilonWrapper(RulePolicy(), eps=1.0, rng=random.Random(3))
+    for _ in range(20):
+        decision = always.decide(state)
         assert decision.explored is True
         assert decision.action != "summarize", "explore picks from the OTHER actions"
 

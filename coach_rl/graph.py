@@ -13,7 +13,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, START, StateGraph
 
 from .actions import Action
-from .llm import LLMClient
+from .llm import LLM
 from .policy import Decision, Policy
 from .prompts import (
     CLASSIFY_SYSTEM,
@@ -58,7 +58,7 @@ def state_summary(state: TurnState) -> str:
     )
 
 
-def build_graph(llm: LLMClient, policy: Policy) -> Any:
+def build_graph(llm: LLM, policy: Policy) -> Any:
     """Compile the three-node graph against a given LLM and policy."""
 
     async def classify_state(state: GraphState) -> dict[str, Any]:

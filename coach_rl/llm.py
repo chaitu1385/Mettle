@@ -1,9 +1,8 @@
-"""The model boundary: a Protocol the graph depends on, and its Anthropic client.
+"""The model boundary: the only module that knows the vendor.
 
-`LLMClient` is the seam. `graph.py`, `judge.py`, and `session.py` depend on the
-Protocol, never on the concrete client, so the decision loop can be exercised
-without a network or an API key -- and so a second provider, a cache, or a
-replay harness can be dropped in without touching them.
+`graph.py`, `judge.py` and `session.py` take an `LLM` and call two methods on
+it. Anything with those two methods works -- the tests pass a stub and run the
+whole decision loop with no network and no API key.
 
 Two call shapes are all the loop needs:
 
@@ -23,7 +22,7 @@ project is built to avoid. A refusal here should be visible, not routed around.
 from __future__ import annotations
 
 import json
-from typing import Any, Protocol, Sequence, TypeVar
+from typing import Any, Sequence, TypeVar
 
 import anthropic
 from pydantic import BaseModel, ValidationError
@@ -35,22 +34,6 @@ MAX_TOKENS = 1024
 
 class LLMError(RuntimeError):
     """A model call that cannot produce a usable result. Never silently swallowed."""
-
-
-class LLMClient(Protocol):
-    """What the decision loop requires of a model. Implemented by `LLM`."""
-
-    model: str
-
-    async def structured(
-        self, *, system: str, user: str, schema: type[T], effort: str = ...
-    ) -> T:
-        ...
-
-    async def text(
-        self, *, system: str, messages: Sequence[dict[str, Any]], effort: str = ...
-    ) -> str:
-        ...
 
 
 def _json_schema(model: type[BaseModel]) -> dict[str, Any]:

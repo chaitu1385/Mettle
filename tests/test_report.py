@@ -8,9 +8,8 @@ dataset -- not the exact column widths.
 
 from __future__ import annotations
 
-from coach_rl.config import MIN_LABELS_FOR_VALIDATION
 from coach_rl.report import format_report, warning_lines
-from coach_rl.stats import judge_correlations
+from coach_rl.stats import MIN_LABELS_FOR_VALIDATION, judge_correlations
 
 from .conftest import make_record
 from .test_stats import make_turn

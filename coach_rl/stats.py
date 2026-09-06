@@ -23,14 +23,22 @@ from typing import Iterable, Sequence
 from scipy import stats as scipy_stats
 
 from .actions import ACTIONS
-from .config import CORRELATION_WARN_THRESHOLD
 from .schemas import JUDGE_DIMENSIONS
 from .storage import TurnRecord
 
-#: Total judge score (3-15) at or above which a turn counts as judge-high.
+#: Every dimension is scored 1-5, so a turn's total runs 3-15.
+JUDGE_MIN_TOTAL = 1 * len(JUDGE_DIMENSIONS)
+JUDGE_MAX_TOTAL = 5 * len(JUDGE_DIMENSIONS)
+
+#: Totals at or above / at or below these count as judge-high / judge-low.
 JUDGE_HIGH_TOTAL = 12
-#: Total judge score at or below which a turn counts as judge-low.
 JUDGE_LOW_TOTAL = 6
+
+#: Turns needed before judge-vs-human validation is worth running.
+MIN_LABELS_FOR_VALIDATION = 40
+
+#: Correlation below this means the judge is not measuring what you see.
+CORRELATION_WARN_THRESHOLD = 0.3
 
 HUMAN_LABELS = (-1, 0, 1)
 BANDS = ("high", "mid", "low")
@@ -64,7 +72,6 @@ class LabeledTurn:
 class ActionScores:
     """Mean judge score per dimension for one action, over its judged turns."""
 
-    n: int
     means: dict[str, float]
 
     @property
@@ -157,8 +164,7 @@ def mean_judge_score_per_action(
     return {
         action: (
             ActionScores(
-                n=len(rows),
-                means={d: sum(r[d] for r in rows) / len(rows) for d in JUDGE_DIMENSIONS},
+                {d: sum(r[d] for r in rows) / len(rows) for d in JUDGE_DIMENSIONS}
             )
             if rows
             else None

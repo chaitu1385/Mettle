@@ -224,7 +224,6 @@ def test_mean_judge_score_per_action_skips_unjudged_turns():
         {"insight": 3.0, "specificity": 3.0, "forward_movement": 2.0}
     )
     assert means["ask"].total == pytest.approx(8.0)
-    assert means["ask"].n == 2
     assert means["advise"].total == pytest.approx(15.0)
     assert means["reflect"] is None
 
