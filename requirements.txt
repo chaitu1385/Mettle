@@ -1,0 +1,5 @@
+# Runtime dependencies. Tests also need pytest: pip install -e ".[dev]"
+anthropic>=1.0
+langgraph>=1.0
+pydantic>=2.7
+scipy>=1.11
