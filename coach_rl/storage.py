@@ -25,8 +25,6 @@ from typing import Any, Iterator, Sequence
 
 from .actions import ACTIONS
 
-SCHEMA_VERSION = 1
-
 _ACTION_LIST_SQL = ", ".join(f"'{a}'" for a in ACTIONS)
 
 SCHEMA = f"""
@@ -60,20 +58,11 @@ CREATE TABLE IF NOT EXISTS turns (
 
 CREATE INDEX IF NOT EXISTS idx_turns_action ON turns(action);
 CREATE INDEX IF NOT EXISTS idx_turns_label  ON turns(human_label);
-
-CREATE TABLE IF NOT EXISTS schema_meta (
-    key   TEXT PRIMARY KEY,
-    value TEXT NOT NULL
-);
 """
 
 
 def utcnow() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
-
-
-def new_session_id() -> str:
-    return uuid.uuid4().hex[:12]
 
 
 def connect(db_path: str | Path) -> sqlite3.Connection:
@@ -84,11 +73,6 @@ def connect(db_path: str | Path) -> sqlite3.Connection:
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     conn.executescript(SCHEMA)
-    conn.execute(
-        "INSERT OR IGNORE INTO schema_meta(key, value) VALUES ('schema_version', ?)",
-        (str(SCHEMA_VERSION),),
-    )
-    conn.commit()
     return conn
 
 
@@ -166,7 +150,7 @@ def start_session(
     session_id: str | None = None,
     notes: str | None = None,
 ) -> str:
-    session_id = session_id or new_session_id()
+    session_id = session_id or uuid.uuid4().hex[:12]
     conn.execute(
         "INSERT INTO sessions(session_id, started_at, ended_at, session_notes) "
         "VALUES (?, ?, NULL, ?)",
@@ -239,15 +223,6 @@ def fetch_turns(
         params = (session_id,)
     sql += " ORDER BY session_id, turn_index"
     return [TurnRecord.from_row(row) for row in conn.execute(sql, params)]
-
-
-def fetch_labeled_turns(conn: sqlite3.Connection) -> list[TurnRecord]:
-    """Turns carrying both a judge score and a human label -- the validation set."""
-    return [
-        t
-        for t in fetch_turns(conn)
-        if t.human_label is not None and t.judge_scores_json
-    ]
 
 
 def list_sessions(conn: sqlite3.Connection) -> list[sqlite3.Row]:

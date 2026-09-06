@@ -13,9 +13,7 @@ from ..prompts import PROMPT_VERSION
 from ..storage import open_db
 
 BANNER = """coach-rl session
-  Type your message and press enter. Blank line to skip.
-  /quit   end the session   /state  show the last logged state + action
-  Ctrl-D also ends the session.
+  Type your message and press enter. /quit or Ctrl-D ends the session.
 """
 
 
@@ -44,13 +42,14 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 async def run(args: argparse.Namespace) -> int:
     # Imported here so `--help` works without the API key or langgraph installed.
+    from ..llm import LLMError
     from ..session import CoachSession
 
     policy = build_policy(eps=args.eps, seed=args.seed)
     llm = LLM(model=args.model)
 
     with open_db(args.db) as conn:
-        session = CoachSession(
+        session = CoachSession.start(
             llm=llm,
             policy=policy,
             conn=conn,
@@ -63,7 +62,6 @@ async def run(args: argparse.Namespace) -> int:
             f"policy {policy.policy_id} | prompts {PROMPT_VERSION} | db {args.db}\n"
         )
 
-        last_record = None
         try:
             while True:
                 try:
@@ -77,23 +75,14 @@ async def run(args: argparse.Namespace) -> int:
                     continue
                 if message in ("/quit", "/exit"):
                     break
-                if message == "/state":
-                    if last_record is None:
-                        print("(no turns yet)\n")
-                    else:
-                        print(f"  state:  {last_record.state}")
-                        print(f"  action: {last_record.action} ({last_record.policy_id})")
-                        print(f"  probs:  {last_record.action_probs}\n")
-                    continue
-
                 try:
-                    reply, last_record = await session.turn(message)
-                except Exception as exc:
-                    print(f"[error] turn failed, nothing logged: {exc}\n", file=sys.stderr)
+                    reply, record = await session.turn(message)
+                except LLMError as exc:
+                    print(f"[model] turn failed, nothing logged: {exc}\n", file=sys.stderr)
                     continue
 
-                marker = " *explore*" if last_record.explored else ""
-                print(f"\ncoach [{last_record.action}{marker}] > {reply}\n")
+                marker = " *explore*" if record.explored else ""
+                print(f"\ncoach [{record.action}{marker}] > {reply}\n")
         finally:
             print("closing session (waiting for outstanding judge calls)...")
             await session.close()

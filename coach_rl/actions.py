@@ -24,13 +24,9 @@ ACTION_INDEX: dict[str, int] = {a: i for i, a in enumerate(ACTIONS)}
 PROB_TOLERANCE = 1e-9
 
 
-def is_action(value: object) -> bool:
-    return isinstance(value, str) and value in ACTION_INDEX
-
-
 def require_action(value: object) -> Action:
     """Return `value` if it is a known action, else raise."""
-    if not is_action(value):
+    if value not in ACTION_INDEX:
         raise ValueError(f"unknown action {value!r}; must be one of {list(ACTIONS)}")
     return value  # type: ignore[return-value]
 
@@ -58,8 +54,3 @@ def validate_probs(probs: Sequence[float]) -> list[float]:
     if abs(total - 1.0) > 1e-6:
         raise ValueError(f"probabilities must sum to 1, got {total}")
     return values
-
-
-def probs_as_dict(probs: Sequence[float]) -> dict[str, float]:
-    """Human-readable view; the stored form stays a list aligned with ACTIONS."""
-    return {a: float(p) for a, p in zip(ACTIONS, probs)}

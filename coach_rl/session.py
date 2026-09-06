@@ -19,7 +19,7 @@ from dataclasses import dataclass
 
 from .graph import build_graph
 from .judge import JudgeRunner
-from .llm import LLM
+from .llm import LLMClient
 from .policy import Policy
 from .prompts import PROMPT_VERSION
 from .storage import TurnRecord, insert_turn, start_session, end_session
@@ -38,22 +38,37 @@ class CoachSession:
 
     def __init__(
         self,
-        llm: LLM,
+        llm: LLMClient,
         policy: Policy,
         conn: sqlite3.Connection,
-        session_id: str | None = None,
-        notes: str | None = None,
+        session_id: str,
         verbose_judge: bool = False,
     ):
         self.llm = llm
         self.policy = policy
         self.conn = conn
+        self.session_id = session_id
         self.graph = build_graph(llm, policy)
         self.judge = JudgeRunner(llm, conn, verbose=verbose_judge)
-        self.session_id = start_session(conn, session_id, notes)
         self.history: list[dict[str, str]] = []
         self.turn_index = 0
         self.pending: PendingJudge | None = None
+
+    @classmethod
+    def start(
+        cls,
+        llm: LLMClient,
+        policy: Policy,
+        conn: sqlite3.Connection,
+        notes: str | None = None,
+        verbose_judge: bool = False,
+    ) -> "CoachSession":
+        """Open the session row, then bind a runner to it.
+
+        The row is created here rather than in `__init__` so constructing the
+        object has no side effects: the write is explicit and visible.
+        """
+        return cls(llm, policy, conn, start_session(conn, notes=notes), verbose_judge)
 
     async def turn(self, user_message: str) -> tuple[str, TurnRecord]:
         """Handle one coachee message: judge the previous turn, then answer this one."""

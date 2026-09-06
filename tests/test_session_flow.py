@@ -10,13 +10,11 @@ from __future__ import annotations
 
 import asyncio
 
-import pytest
-
 from coach_rl.policy import RulePolicy
 from coach_rl.prompts import PROMPT_VERSION
 from coach_rl.schemas import ClassifiedState, JudgeScores
 from coach_rl.session import CoachSession
-from coach_rl.storage import connect, fetch_turns
+from coach_rl.storage import fetch_turns
 
 
 class StubLLM:
@@ -47,16 +45,9 @@ class StubLLM:
         return "Say the thing you are avoiding saying."
 
 
-@pytest.fixture()
-def conn(tmp_path):
-    connection = connect(tmp_path / "flow.db")
-    yield connection
-    connection.close()
-
-
 def test_turns_are_logged_and_the_judge_runs_one_turn_behind(conn):
     llm = StubLLM()
-    session = CoachSession(llm=llm, policy=RulePolicy(), conn=conn)
+    session = CoachSession.start(llm=llm, policy=RulePolicy(), conn=conn)
 
     async def scenario():
         await session.turn("Should I take the reorg or fight it?")
@@ -94,7 +85,7 @@ def test_a_failing_judge_does_not_lose_the_turn(conn):
             )
 
     llm = BrokenJudge()
-    session = CoachSession(llm=llm, policy=RulePolicy(), conn=conn)
+    session = CoachSession.start(llm=llm, policy=RulePolicy(), conn=conn)
 
     async def scenario():
         await session.turn("first")

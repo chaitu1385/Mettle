@@ -146,6 +146,41 @@ Defaults live in `coach_rl/config.py` and can be overridden by env or `.env`:
 `COACH_RL_MODEL` (default `claude-opus-5`), `COACH_RL_DB` (default
 `coach_rl.db`), `COACH_RL_EPS` (default `0.2`).
 
+## Structure
+
+The package is layered, and the layering is enforced by a test
+(`tests/test_layering.py`) rather than left to good intentions: imports may only
+point downwards, and each third-party boundary lives in exactly one module.
+
+```
+5  cli/run.py, cli/replay.py, cli/stats.py   terminal entry points
+4  session.py     turn orchestration and row writing
+   report.py      rendering of the stats (no computation)
+3  graph.py       LangGraph: classify_state -> select_action -> generate_response
+   judge.py       the async judge and its task tracker
+   stats.py       descriptive stats + judge validation (pure functions)
+2  storage.py     SQLite schema and accessors
+   policy.py      Policy interface, RulePolicy, EpsilonWrapper
+1  schemas.py     TurnState, JudgeScores (Pydantic)
+   prompts.py     prompt text + PROMPT_VERSION + fingerprint
+   llm.py         LLMClient protocol + the Anthropic client behind it
+0  actions.py     the fixed action space
+   config.py      settings and thresholds
+```
+
+Consequences worth stating:
+
+- `anthropic` is imported only by `llm.py`, `langgraph` only by `graph.py`,
+  `scipy` only by `stats.py`. The domain does not know who the vendor is.
+- `graph.py`, `judge.py`, and `session.py` depend on the `LLMClient` **Protocol**,
+  not the client, so the whole decision loop runs against a stub with no API key
+  — which is exactly how `tests/test_session_flow.py` exercises it.
+- Computation and presentation are separate: `stats.py` returns numbers,
+  `report.py` turns them into text. The validation rule ("this dimension fails")
+  is defined once, on `Correlation.below_threshold`.
+- Constructing a `CoachSession` writes nothing; `CoachSession.start()` opens the
+  session row. No I/O hidden in a constructor.
+
 ## Tests
 
 ```bash
@@ -154,26 +189,9 @@ pytest
 
 Covering the SQLite schema and its constraints, the state and judge models, the
 policy interface and epsilon mixing, the correlation maths (pinned to
-hand-computed Spearman values), the prompt-version guard, and the turn-loop
-ordering with a stub LLM. **The LLM calls themselves are not tested.**
-
-## Layout
-
-```
-coach_rl/
-  actions.py     the fixed action space
-  schemas.py     TurnState, JudgeScores (Pydantic)
-  prompts.py     all prompt text + PROMPT_VERSION + fingerprint
-  policy.py      Policy interface, RulePolicy, EpsilonWrapper
-  llm.py         async Anthropic wrapper (structured output, retry once)
-  graph.py       LangGraph: classify_state -> select_action -> generate_response
-  judge.py       the async judge and its task tracker
-  session.py     turn orchestration and row writing
-  storage.py     SQLite schema and accessors
-  stats.py       descriptive stats + judge validation (pure functions)
-  cli/           run, replay/label, stats
-tests/
-```
+hand-computed Spearman values), report rendering, the prompt-version guard, the
+turn-loop ordering with a stub LLM, and the layering rules above. **The LLM
+calls themselves are not tested.**
 
 ## Out of scope for this milestone
 

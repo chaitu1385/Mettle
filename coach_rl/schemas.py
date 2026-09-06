@@ -11,7 +11,7 @@ a hallucinated extra field a hard failure rather than a silently dropped one.
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -96,10 +96,3 @@ class JudgeScores(BaseModel):
 JUDGE_DIMENSIONS: tuple[str, ...] = ("insight", "specificity", "forward_movement")
 JUDGE_MIN_TOTAL = 3
 JUDGE_MAX_TOTAL = 15
-
-
-def json_schema_for(model: type[BaseModel]) -> dict[str, Any]:
-    """JSON schema in the shape the Messages API structured-output format wants."""
-    schema = model.model_json_schema()
-    schema.pop("title", None)
-    return schema

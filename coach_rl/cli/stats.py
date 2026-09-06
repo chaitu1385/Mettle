@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 
 from ..config import Settings
-from ..stats import format_report
+from ..report import format_report
 from ..storage import fetch_turns, open_db
 
 

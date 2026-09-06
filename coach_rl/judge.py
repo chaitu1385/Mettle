@@ -16,14 +16,14 @@ import asyncio
 import json
 import sqlite3
 
-from .llm import LLM
+from .llm import LLMClient
 from .prompts import JUDGE_SYSTEM, JUDGE_USER_TEMPLATE
 from .schemas import JudgeScores
 from .storage import attach_judge
 
 
 async def judge_turn(
-    llm: LLM,
+    llm: LLMClient,
     *,
     user_message: str,
     action: str,
@@ -47,7 +47,7 @@ async def judge_turn(
 class JudgeRunner:
     """Fire-and-track judge tasks; write scores back to the row when they land."""
 
-    def __init__(self, llm: LLM, conn: sqlite3.Connection, verbose: bool = False):
+    def __init__(self, llm: LLMClient, conn: sqlite3.Connection, verbose: bool = False):
         self.llm = llm
         self.conn = conn
         self.verbose = verbose

@@ -16,20 +16,9 @@ import pytest
 
 from coach_rl.actions import ACTIONS, ACTION_INDEX, N_ACTIONS, one_hot, validate_probs
 from coach_rl.policy import Decision, EpsilonWrapper, Policy, RulePolicy, build_policy
-from coach_rl.schemas import ClassifiedState, TurnState
+from coach_rl.schemas import TurnState
 
-
-def make_state(**overrides) -> TurnState:
-    base = dict(
-        user_intent="explore",
-        emotional_valence=0.0,
-        specificity_level="specific",
-        repeated_theme_flag=False,
-        session_phase="exploration",
-    )
-    base.update(overrides)
-    turn_index = base.pop("turn_index", 1)
-    return TurnState.from_classified(ClassifiedState(**base), turn_index)
+from .conftest import make_state
 
 
 # --- the interface ---------------------------------------------------------

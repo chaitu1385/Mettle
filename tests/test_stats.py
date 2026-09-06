@@ -1,19 +1,17 @@
-"""Statistics tests, with the correlation maths checked against known values.
+"""Statistics tests: the correlation maths, pinned to hand-computed values.
 
-The judge-validation numbers are the ones most likely to be believed without
-being checked, so they are pinned against hand-computable cases: perfect
-agreement, perfect disagreement, a tie-heavy case, and the degenerate cases
-where Spearman is simply undefined.
+These numbers are the ones most likely to be believed without being checked, so
+they are asserted against cases worked out by hand -- perfect agreement, perfect
+disagreement, ties, and the degenerate cases where Spearman is undefined.
+Rendering is tested separately in test_report.py.
 """
 
 from __future__ import annotations
 
-import json
 import math
 
 import pytest
 
-from coach_rl.config import CORRELATION_WARN_THRESHOLD, MIN_LABELS_FOR_VALIDATION
 from coach_rl.stats import (
     JUDGE_HIGH_TOTAL,
     JUDGE_LOW_TOTAL,
@@ -21,14 +19,13 @@ from coach_rl.stats import (
     action_distribution,
     confusion_table,
     explore_count,
-    format_report,
     judge_correlations,
     mean_judge_score_per_action,
     spearman,
     to_labeled_turns,
-    validation_warnings,
 )
-from coach_rl.storage import TurnRecord
+
+from .conftest import make_record
 
 
 def make_turn(
@@ -50,42 +47,6 @@ def make_turn(
         },
         human_label=human_label,
         rationale=rationale,
-    )
-
-
-def make_record(
-    turn_index: int,
-    action: str = "ask",
-    scores: dict | None = None,
-    human_label: int | None = None,
-    explored: bool = False,
-    eps: float = 0.2,
-    prompt_version: str = "v1",
-    model_name: str = "claude-opus-5",
-) -> TurnRecord:
-    probs = [0.05, 0.05, 0.8, 0.05, 0.05]
-    return TurnRecord(
-        session_id="s1",
-        turn_index=turn_index,
-        state_json=json.dumps({"user_intent": "explore", "turn_index": turn_index}),
-        action=action,
-        action_probs_json=json.dumps(
-            {
-                "order": ["ask", "reflect", "challenge", "advise", "summarize"],
-                "probs": probs,
-                "base_probs": [0, 0, 1, 0, 0],
-                "explored": explored,
-            }
-        ),
-        policy_id="rule/v1+eps0.2",
-        eps=eps,
-        response_text="reply",
-        user_message="message",
-        model_name=model_name,
-        prompt_version=prompt_version,
-        judge_scores_json=json.dumps(scores) if scores else None,
-        judge_rationale="rationale" if scores else None,
-        human_label=human_label,
     )
 
 
@@ -200,29 +161,27 @@ def test_warns_only_for_the_dimension_that_fails():
     assert correlations["specificity"].rho == pytest.approx(0.0, abs=1e-9)
     assert correlations["insight"].rho == pytest.approx(9 / math.sqrt(90), abs=1e-4)
 
-    warnings = validation_warnings(list(correlations.values()))
-    assert len(warnings) == 1
-    assert warnings[0].startswith("specificity:")
-    assert str(CORRELATION_WARN_THRESHOLD) in warnings[0]
+    failing = [c.name for c in correlations.values() if c.below_threshold]
+    assert failing == ["specificity"]
 
 
-def test_a_strongly_negative_correlation_also_warns():
+def test_a_strongly_negative_correlation_also_fails():
     """abs() would hide the worst case: a judge that is reliably backwards."""
     turns = [make_turn((s, s, s), -1 if s > 3 else 1, i) for i, s in enumerate([1, 2, 4, 5])]
-    warnings = validation_warnings(judge_correlations(turns))
-    assert len(warnings) == 4
+    assert all(c.below_threshold for c in judge_correlations(turns))
 
 
-def test_no_warnings_when_every_dimension_tracks():
+def test_nothing_fails_when_every_dimension_tracks():
     turns = [make_turn((s, s, s), 1 if s > 3 else -1, i) for i, s in enumerate([1, 2, 4, 5])]
-    assert validation_warnings(judge_correlations(turns)) == []
+    assert not any(c.below_threshold for c in judge_correlations(turns))
 
 
-def test_undefined_correlation_is_warned_not_hidden():
+def test_undefined_correlation_counts_as_failing():
+    """No variance in the labels is not a pass -- it is "you cannot tell yet"."""
     turns = [make_turn((3, 3, 3), 1, i) for i in range(5)]
-    warnings = validation_warnings(judge_correlations(turns))
-    assert len(warnings) == 4
-    assert all("undefined" in w for w in warnings)
+    correlations = judge_correlations(turns)
+    assert not any(c.defined for c in correlations)
+    assert all(c.below_threshold for c in correlations)
 
 
 # --- confusion table -------------------------------------------------------
@@ -237,7 +196,6 @@ def test_confusion_table_counts_and_disagreements():
         make_turn((3, 3, 3), 0, 4),
     ]
     table = confusion_table(turns)
-    assert table.n == 5
     assert table.count("high", -1) == 1
     assert table.count("high", 1) == 1
     assert table.count("low", 1) == 1
@@ -284,12 +242,12 @@ def test_mean_judge_score_per_action_skips_unjudged_turns():
         make_record(3, "advise", scores={"insight": 5, "specificity": 5, "forward_movement": 5}),
     ]
     means = mean_judge_score_per_action(records)
-    assert means["ask"]["insight"] == pytest.approx(3.0)
-    assert means["ask"]["specificity"] == pytest.approx(3.0)
-    assert means["ask"]["forward_movement"] == pytest.approx(2.0)
-    assert means["ask"]["total"] == pytest.approx(8.0)
-    assert means["ask"]["n"] == 2
-    assert means["advise"]["total"] == pytest.approx(15.0)
+    assert means["ask"].means == pytest.approx(
+        {"insight": 3.0, "specificity": 3.0, "forward_movement": 2.0}
+    )
+    assert means["ask"].total == pytest.approx(8.0)
+    assert means["ask"].n == 2
+    assert means["advise"].total == pytest.approx(15.0)
     assert means["reflect"] is None
 
 
@@ -303,50 +261,3 @@ def test_to_labeled_turns_requires_both_signals():
     ]
     labeled = to_labeled_turns(records)
     assert [t.turn_index for t in labeled] == [0]
-
-
-# --- report ----------------------------------------------------------------
-
-
-def test_report_holds_back_validation_until_the_threshold():
-    scores = {"insight": 3, "specificity": 3, "forward_movement": 3}
-    records = [make_record(i, scores=scores, human_label=1) for i in range(5)]
-    report = format_report(records)
-    assert f"5/{MIN_LABELS_FOR_VALIDATION}" in report
-    assert "spearman" not in report.lower()
-
-
-def test_report_runs_validation_once_there_are_enough_labels():
-    records = []
-    for i in range(MIN_LABELS_FOR_VALIDATION):
-        score = 1 + (i % 5)
-        records.append(
-            make_record(
-                i,
-                action="ask" if i % 2 else "challenge",
-                scores={
-                    "insight": score,
-                    "specificity": score,
-                    "forward_movement": score,
-                },
-                human_label=1 if score > 3 else -1,
-                explored=i % 5 == 0,
-            )
-        )
-    report = format_report(records)
-    assert "spearman rho" in report
-    assert "judge band x human label" in report
-    assert f"turns:            {MIN_LABELS_FOR_VALIDATION}" in report
-    assert "epsilon-explored: 8" in report
-
-
-def test_report_flags_mixed_prompt_versions():
-    records = [
-        make_record(0, prompt_version="v1"),
-        make_record(1, prompt_version="v2"),
-    ]
-    assert "mixed prompt versions" in format_report(records)
-
-
-def test_report_on_an_empty_database():
-    assert "No turns logged yet" in format_report([])

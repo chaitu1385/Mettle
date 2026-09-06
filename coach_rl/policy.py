@@ -54,10 +54,6 @@ class Policy(ABC):
     def policy_id(self) -> str:
         """Stable identifier logged on every row, e.g. 'rule/v1+eps0.2'."""
 
-    @property
-    def eps(self) -> float:
-        return 0.0
-
     @abstractmethod
     def decide(self, state: TurnState) -> Decision:
         ...
@@ -133,21 +129,17 @@ class EpsilonWrapper(Policy):
         if not 0.0 <= eps <= 1.0:
             raise ValueError(f"eps must be in [0, 1], got {eps}")
         self.inner = inner
-        self._eps = eps
+        self.eps = eps
         self.rng = rng or random.Random()
 
     @property
     def policy_id(self) -> str:
-        return f"{self.inner.policy_id}+eps{self._eps:g}"
-
-    @property
-    def eps(self) -> float:
-        return self._eps
+        return f"{self.inner.policy_id}+eps{self.eps:g}"
 
     def mixed_probs(self, base_probs: list[float]) -> list[float]:
-        spread = self._eps / (N_ACTIONS - 1)
+        spread = self.eps / (N_ACTIONS - 1)
         return validate_probs(
-            [(1.0 - self._eps) * p + spread * (1.0 - p) for p in base_probs]
+            [(1.0 - self.eps) * p + spread * (1.0 - p) for p in base_probs]
         )
 
     def decide(self, state: TurnState) -> Decision:
@@ -157,7 +149,7 @@ class EpsilonWrapper(Policy):
 
         action = inner.action
         explored = False
-        if self._eps > 0.0 and self.rng.random() < self._eps:
+        if self.eps > 0.0 and self.rng.random() < self.eps:
             alternatives = [a for a in ACTIONS if a != inner.action]
             action = self.rng.choice(alternatives)
             explored = True
@@ -168,7 +160,7 @@ class EpsilonWrapper(Policy):
             policy_id=self.policy_id,
             base_probs=base_probs,
             explored=explored,
-            eps=self._eps,
+            eps=self.eps,
         )
 
 
